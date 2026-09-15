@@ -1,0 +1,281 @@
+### CampusGigs - roteiro de testes manuais
+### IntelliJ HTTP Client ou extensao REST Client do VS Code.
+### Execute de cima para baixo: as variaveis sao capturadas das respostas.
+
+@host = http://localhost:8080
+
+### ---------------------------------------------------------------- CP2
+### 1. Cadastrar Ana (com CEP -> dispara a integracao ViaCEP)
+# @name registrarAna
+POST {{host}}/auth/registrar
+Content-Type: application/json
+
+{
+  "nome": "Ana Souza",
+  "email": "ana@campusgigs.com",
+  "senha": "senha12345",
+  "cep": "01310-100"
+}
+
+### 2. Cadastrar Bruno
+POST {{host}}/auth/registrar
+Content-Type: application/json
+
+{
+  "nome": "Bruno Lima",
+  "email": "bruno@campusgigs.com",
+  "senha": "senha12345"
+}
+
+### 3. E-mail duplicado -> 409
+POST {{host}}/auth/registrar
+Content-Type: application/json
+
+{
+  "nome": "Ana Clone",
+  "email": "ana@campusgigs.com",
+  "senha": "senha12345"
+}
+
+### 4. Validacao de campos -> 400
+POST {{host}}/auth/registrar
+Content-Type: application/json
+
+{
+  "nome": "",
+  "email": "nao-e-email",
+  "senha": "123"
+}
+
+### ---------------------------------------------------------------- CP3
+### 5. Login da Ana
+# @name loginAna
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@campusgigs.com",
+  "senha": "senha12345"
+}
+
+> {% client.global.set("tokenAna", response.body.token); %}
+
+### 6. Login do Bruno
+# @name loginBruno
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bruno@campusgigs.com",
+  "senha": "senha12345"
+}
+
+> {% client.global.set("tokenBruno", response.body.token); %}
+
+### 7. Login do ADMIN (seed da migration V2)
+# @name loginAdmin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@campusgigs.com",
+  "senha": "admin123"
+}
+
+> {% client.global.set("tokenAdmin", response.body.token); %}
+
+### 8. Senha errada -> 401
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@campusgigs.com",
+  "senha": "errada"
+}
+
+### 9. Publicar SEM token -> 401
+POST {{host}}/servicos
+Content-Type: application/json
+
+{
+  "titulo": "Sem token",
+  "descricao": "Nao deve passar",
+  "categoria": "Geral",
+  "preco": 10.00
+}
+
+### 10. Publicar com token INVALIDO -> 401
+POST {{host}}/servicos
+Content-Type: application/json
+Authorization: Bearer token.completamente.invalido
+
+{
+  "titulo": "Token falso",
+  "descricao": "Nao deve passar",
+  "categoria": "Geral",
+  "preco": 10.00
+}
+
+### ---------------------------------------------------------------- Servicos
+### 11. Ana publica um freela -> 201
+# @name servicoAna
+POST {{host}}/servicos
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{
+  "titulo": "Monitoria de Java",
+  "descricao": "Aulas particulares de POO e Spring Boot",
+  "categoria": "Educacao",
+  "preco": 80.00
+}
+
+> {% client.global.set("servicoAna", response.body.id); %}
+
+### 12. Bruno publica um freela -> 201
+# @name servicoBruno
+POST {{host}}/servicos
+Content-Type: application/json
+Authorization: Bearer {{tokenBruno}}
+
+{
+  "titulo": "Criacao de logo",
+  "descricao": "Identidade visual para projetos academicos",
+  "categoria": "Design",
+  "preco": 150.00
+}
+
+> {% client.global.set("servicoBruno", response.body.id); %}
+
+### 13. Listagem publica (sem token)
+GET {{host}}/servicos?situacao=ATIVO&page=0&size=10
+
+### 14. Detalhe publico
+GET {{host}}/servicos/{{servicoAna}}
+
+### ---------------------------------------------------------------- CP4
+### 15. Bruno tenta EDITAR o servico da Ana -> 403
+PUT {{host}}/servicos/{{servicoAna}}
+Content-Type: application/json
+Authorization: Bearer {{tokenBruno}}
+
+{
+  "titulo": "Invadido",
+  "descricao": "Nao deveria passar",
+  "categoria": "Educacao",
+  "preco": 1.00
+}
+
+### 16. Ana edita o PROPRIO servico -> 200
+PUT {{host}}/servicos/{{servicoAna}}
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{
+  "titulo": "Monitoria de Java e Spring",
+  "descricao": "Aulas de POO, JPA e Spring Boot",
+  "categoria": "Educacao",
+  "preco": 95.00
+}
+
+### 17. ACESSO NEGADO POR PAPEL - USER na area ADMIN -> 403
+GET {{host}}/admin/usuarios
+Authorization: Bearer {{tokenAna}}
+
+### 18. Mesma rota com ADMIN -> 200
+GET {{host}}/admin/usuarios
+Authorization: Bearer {{tokenAdmin}}
+
+### ---------------------------------------------------------------- Contratacoes
+### 19. Ana tenta contratar o PROPRIO servico -> 403
+POST {{host}}/contratacoes
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{ "servicoId": {{servicoAna}} }
+
+### 20. Bruno contrata o servico da Ana -> 201
+# @name contratacao
+POST {{host}}/contratacoes
+Content-Type: application/json
+Authorization: Bearer {{tokenBruno}}
+
+{ "servicoId": {{servicoAna}} }
+
+> {% client.global.set("contratacao", response.body.id); %}
+
+### 21. Contratacao duplicada em aberto -> 409
+POST {{host}}/contratacoes
+Content-Type: application/json
+Authorization: Bearer {{tokenBruno}}
+
+{ "servicoId": {{servicoAna}} }
+
+### 22. Bruno (contratante) tenta ACEITAR -> 403
+PATCH {{host}}/contratacoes/{{contratacao}}/aceitar
+Authorization: Bearer {{tokenBruno}}
+
+### 23. Ana (prestadora) aceita -> 200
+PATCH {{host}}/contratacoes/{{contratacao}}/aceitar
+Authorization: Bearer {{tokenAna}}
+
+### 24. Ana conclui -> 200
+PATCH {{host}}/contratacoes/{{contratacao}}/concluir
+Authorization: Bearer {{tokenAna}}
+
+### 25. Cancelar contratacao ja concluida -> 409
+PATCH {{host}}/contratacoes/{{contratacao}}/cancelar
+Authorization: Bearer {{tokenAna}}
+
+### 26. Minhas contratacoes
+GET {{host}}/contratacoes/minhas
+Authorization: Bearer {{tokenBruno}}
+
+### ---------------------------------------------------------------- Situacao do servico
+### 27. Bruno pausa o proprio servico -> 200
+PATCH {{host}}/servicos/{{servicoBruno}}/pausar
+Authorization: Bearer {{tokenBruno}}
+
+### 28. Ana tenta contratar servico PAUSADO -> 409
+POST {{host}}/contratacoes
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{ "servicoId": {{servicoBruno}} }
+
+### 29. Ana tenta ENCERRAR servico de terceiro -> 403
+PATCH {{host}}/servicos/{{servicoBruno}}/encerrar
+Authorization: Bearer {{tokenAna}}
+
+### 30. ADMIN encerra servico de terceiro -> 200
+PATCH {{host}}/servicos/{{servicoBruno}}/encerrar
+Authorization: Bearer {{tokenAdmin}}
+
+### ---------------------------------------------------------------- CP5
+### 31. Perfil do usuario autenticado
+GET {{host}}/usuarios/me
+Authorization: Bearer {{tokenAna}}
+
+### 32. Atualizar CEP -> 200 com cidade e UF do ViaCEP
+PUT {{host}}/usuarios/me/cep
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{ "cep": "20040-020" }
+
+### 33. CEP inexistente -> 400
+PUT {{host}}/usuarios/me/cep
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{ "cep": "99999999" }
+
+### 34. CEP com formato invalido -> 400 (validacao, nem chega no ViaCEP)
+PUT {{host}}/usuarios/me/cep
+Content-Type: application/json
+Authorization: Bearer {{tokenAna}}
+
+{ "cep": "123" }
+
+### 35. Recurso inexistente -> 404
+GET {{host}}/servicos/99999999
