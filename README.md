@@ -6,6 +6,11 @@ API REST que sustenta uma plataforma de freelas universitários: um aluno public
 
 ---
 
+## Participantes
+
+- **Pietro Abrahamian** — RM561469
+- **Pedro Peres** — RM561792
+
 ## Como executar
 
 Pré-requisito: **apenas Docker e Docker Compose**. Não é preciso instalar Java, Maven ou Postgres.
@@ -213,7 +218,14 @@ Timeouts são explícitos (3s de conexão, 5s de leitura): sem eles, uma lentid�
 
 ```bash
 mvn test                    # testes unitários das regras de domínio
-./scripts/smoke-test.sh     # roteiro end-to-end com a API no ar (inclui o caso de 403 por papel)
+./scripts/CampusGigs_Postman_Collection.json    
 ```
 
-O arquivo `requests.http` cobre os mesmos fluxos para uso no IntelliJ / VS Code REST Client.
+Criando o Perfil da Ana
+![img.png](img.png)
+
+Bruno publica freela
+![img_1.png](img_1.png)
+
+Admin lista os usuários
+![img_2.png](img_2.png)
