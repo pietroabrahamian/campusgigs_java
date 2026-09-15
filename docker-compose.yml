@@ -1,0 +1,37 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: campusgigs-db
+    environment:
+      POSTGRES_DB: campusgigs
+      POSTGRES_USER: campusgigs
+      POSTGRES_PASSWORD: campusgigs
+    ports:
+      - "5432:5432"
+    volumes:
+      - campusgigs-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusgigs -d campusgigs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: campusgigs-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/campusgigs
+      DB_USERNAME: campusgigs
+      DB_PASSWORD: campusgigs
+      JWT_SECRET: troque-esta-chave-em-producao-com-no-minimo-32-bytes-0123456789
+      JWT_EXPIRACAO_MINUTOS: 120
+      VIACEP_URL: https://viacep.com.br
+    ports:
+      - "8080:8080"
+
+volumes:
+  campusgigs-data:
